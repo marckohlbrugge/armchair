@@ -21,4 +21,24 @@ class TranscriptEvent < ApplicationRecord
       received_at: Time.current
     )
   end
+
+  def self.from_openai(stream_session, payload)
+    kind = payload["type"].to_s
+    transcript = case kind
+    when "conversation.item.input_audio_transcription.delta"
+      payload["delta"]
+    when "conversation.item.input_audio_transcription.completed"
+      payload["transcript"]
+    end
+
+    create!(
+      stream_session: stream_session,
+      payload: payload,
+      kind: kind.presence || "openai_event",
+      is_final: kind == "conversation.item.input_audio_transcription.completed",
+      speech_final: kind == "conversation.item.input_audio_transcription.completed",
+      transcript: transcript,
+      received_at: Time.current
+    )
+  end
 end

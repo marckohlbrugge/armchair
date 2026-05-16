@@ -16,13 +16,24 @@ class StreamSession::TurnBuilder
   end
 
   def handle(raw)
+    handle_deepgram(raw)
+  end
+
+  def handle_deepgram(raw)
     data = JSON.parse(raw)
     ActiveRecord::Base.connection_pool.with_connection do
       TranscriptEvent.from_deepgram(@session, data)
-      advance(data)
+      advance_deepgram(data)
     end
   rescue JSON::ParserError
     nil
+  end
+
+  def handle_openai_event(data)
+    ActiveRecord::Base.connection_pool.with_connection do
+      TranscriptEvent.from_openai(@session, data)
+      advance_openai(data)
+    end
   end
 
   def flush!
@@ -32,7 +43,7 @@ class StreamSession::TurnBuilder
 
   private
 
-  def advance(data)
+  def advance_deepgram(data)
     text = data.dig("channel", "alternatives", 0, "transcript").to_s
     return if text.empty?
 
@@ -47,10 +58,26 @@ class StreamSession::TurnBuilder
     close! if should_close?(data)
   end
 
+  def advance_openai(data)
+    return unless data["type"] == "conversation.item.input_audio_transcription.completed"
+
+    text = data["transcript"].to_s.strip
+    return if text.empty?
+
+    @buffer << text
+    @started_at ||= Time.current
+    close! if should_close_openai?
+  end
+
   def should_close?(data)
     word_count = @buffer.join(" ").split.size
     return true if word_count >= MAX_WORDS_PER_TURN
     data["speech_final"] && word_count >= MIN_WORDS_PER_TURN
+  end
+
+  def should_close_openai?
+    word_count = @buffer.join(" ").split.size
+    word_count >= MIN_WORDS_PER_TURN || word_count >= MAX_WORDS_PER_TURN
   end
 
   def close!

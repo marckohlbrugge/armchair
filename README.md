@@ -47,6 +47,39 @@ Alternatively, self-hosters can set `DEEPGRAM_API_KEY` and `XAI_API_KEY` as envi
 
 Visit `http://localhost:3000`, head to `/manage/sessions/new`, paste a YouTube URL (live or recorded), and watch the personas chime in.
 
+### STT provider + shadow bakeoff
+
+Microphone ingest supports both providers via `STT_PROVIDER`:
+
+- `deepgram` (default)
+- `openai`
+
+You can also run a side-by-side comparison with `STT_SHADOW`:
+
+- When `STT_PROVIDER=deepgram`, set `STT_SHADOW=openai`
+- When `STT_PROVIDER=openai`, set `STT_SHADOW=deepgram`
+
+Example (URL ingest, Deepgram primary + OpenAI shadow):
+
+```bash
+OPENAI_API_KEY=... STT_SHADOW=openai bin/rails runner script/ingest.rb <session-id>
+```
+
+This writes a JSONL log to `log/stt_shadow_<session-id>.jsonl` with timing and transcript events from both providers.
+
+After ingest finishes:
+
+```bash
+bin/rails runner script/stt_bakeoff_report.rb <session-id>
+```
+
+Optional env vars:
+
+- `STT_PROVIDER` (microphone ingest primary; default: `deepgram`)
+- `STT_SHADOW` (`openai` or `deepgram`, must differ from `STT_PROVIDER`)
+- `STT_OPENAI_REALTIME_MODEL` (default: `gpt-realtime-whisper`)
+- `STT_OPENAI_LANGUAGE` (default: `en`)
+
 ## Deploying
 
 The included `Dockerfile` bundles `yt-dlp` and `ffmpeg`, so Kamal deploys work out of the box. Set production credentials before deploying:
