@@ -75,4 +75,4 @@ group :test do
   gem "selenium-webdriver"
 end
 
-gem "mission_control-jobs", "~> 1.1"
+gem "mission_control-jobs", "~> 1.2"
